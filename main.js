@@ -34,7 +34,7 @@ const storage = new CloudinaryStorage({
 }); 
 const upload = multer({ storage: storage });
 
-app.post('/signup', upload.fields([{ name: 'documentFrontFile' }, { name: 'documentBackFile' }]), (req, res) => {
+app.post('/register', upload.fields([{ name: 'documentFrontFile' }, { name: 'documentBackFile' }]), (req, res) => {
   const {
     firstName,
     lastName,
@@ -63,7 +63,7 @@ app.post('/signup', upload.fields([{ name: 'documentFrontFile' }, { name: 'docum
 
   // Insert into MySQL
   const sql = `
-    INSERT INTO users (
+    INSERT INTO usersdata (
       firstName, lastName, dob, motherName, number, email, documentType, documentNumber, 
       documentFrontFile, documentBackFile, password, nomineeName, nomineeEmail, nomineeNumber, nomineeRelationship
     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
@@ -83,6 +83,105 @@ app.post('/signup', upload.fields([{ name: 'documentFrontFile' }, { name: 'docum
   });
 });
 
+// GET: Retrieve user 
+app.get('/allusers', (req, res) => {
+  const userId = req.params.id;
+  const query = 'SELECT * FROM usersdata';
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(results[0]);
+  });
+});
+// GET: Retrieve user by ID
+app.get('/users/:id', (req, res) => {
+  const userId = req.params.id;
+  const query = 'SELECT * FROM usersdata WHERE id = ?';
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (results.length === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json(results[0]);
+  });
+});
+
+// PUT: Update user by ID
+app.put('/updateusers/:id', upload.fields([{ name: 'documentFrontFile' }, { name: 'documentBackFile' }]), async (req, res) => {
+  const userId = req.params.id;
+  const formData = req.body;
+  const files = req.files;
+  
+  try {
+    // Upload files to Cloudinary if they exist
+    if (files.documentFrontFile) {
+      const frontUploadResult = await cloudinary.uploader.upload(files.documentFrontFile[0].path);
+      formData.documentFrontFile = frontUploadResult.secure_url;
+      fs.unlinkSync(files.documentFrontFile[0].path); // Remove the file from the server
+    }
+    if (files.documentBackFile) {
+      const backUploadResult = await cloudinary.uploader.upload(files.documentBackFile[0].path);
+      formData.documentBackFile = backUploadResult.secure_url;
+      fs.unlinkSync(files.documentBackFile[0].path); // Remove the file from the server
+    }
+
+    const query = `
+      UPDATE usersdata 
+      SET firstName = ?, lastName = ?, dob = ?, motherName = ?, number = ?, email = ?, 
+          documentType = ?, documentNumber = ?, documentFrontFile = ?, documentBackFile = ?, 
+          password = ?, nomineeName = ?, nomineeEmail = ?, nomineeNumber = ?, nomineeRelationship = ? 
+      WHERE id = ?
+    `;
+    const values = [
+      formData.firstName, formData.lastName, formData.dob, formData.motherName, formData.number,
+      formData.email, formData.documentType, formData.documentNumber, formData.documentFrontFile,
+      formData.documentBackFile, formData.password, formData.nomineeName, formData.nomineeEmail,
+      formData.nomineeNumber, formData.nomineeRelationship, userId
+    ];
+
+    db.query(query, values, (err, results) => {
+      if (err) {
+        return res.status(500).json({ error: err.message });
+      }
+      if (results.affectedRows === 0) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      res.json({ message: 'User updated successfully' });
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// DELETE: Delete user by ID
+app.delete('/deleteusers/:id', (req, res) => {
+  const userId = req.params.id;
+  const query = 'DELETE FROM usersdata WHERE id = ?';
+
+  db.query(query, [userId], (err, results) => {
+    if (err) {
+      return res.status(500).json({ error: err.message });
+    }
+    if (results.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    res.json({ message: 'User deleted successfully' });
+  });
+});
+
+// Start the server
+const PORT = process.env.PORT || 3000;
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
 
 const createDummyTable = `
   CREATE TABLE if not exists usersdata (
