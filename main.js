@@ -30,7 +30,27 @@ db.query(createDummyTable, (err, result) => {
     console.log('createDummyTable created successfully:');
   });
 
-
+app.post('/savetrade', (req, res)=>{
+    let name = req.body.name
+    let email = req.body.email
+    let value = [[name , email]]
+    let sql = "insert into dummy(name, email) values ?"
+    db.query(sql, [value], (err, result)=>{
+        if(err) throw err
+        else{
+            res.send("data save")
+        }
+    })
+})
+app.get('/gettrade', (req, res)=>{
+    let sql = "select * from dummy"
+    db.query(sql, [value], (err, result)=>{
+        if(err) throw err
+        else{
+            res.json(result)
+        }
+    })
+})
   app.listen(3000, ()=>{
     console.log("server is running")
   })
